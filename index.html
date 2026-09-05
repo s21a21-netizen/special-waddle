@@ -43,8 +43,8 @@
   <p id="status"></p>
   <div id="downloadArea"></div>
 
-  <!-- FFmpeg.wasm (v0.11.x 安定版) の読み込み -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+  <!-- ffmpeg.min.js (v0.11.6) -->
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
   <script>
     const { createFFmpeg, fetchFile } = FFmpeg;
@@ -57,7 +57,6 @@
     const status = document.getElementById('status');
     const downloadArea = document.getElementById('downloadArea');
 
-    // ファイル選択のイベント
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
@@ -71,31 +70,32 @@
       }
     }
 
-    // 変換処理
     convertBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
 
-      status.innerText = 'FFmpegエンジンを読み込み中...';
+      status.innerText = 'FFmpegエンジンを準備中...（初回は数秒かかります）';
       convertBtn.disabled = true;
 
       try {
         if (!ffmpeg) {
-          ffmpeg = createFFmpeg({ log: true });
+          // cdnjsのCoreを参照してSingle Thread環境（SharedArrayBufferなし）で確実に動かす
+          ffmpeg = createFFmpeg({ 
+            log: true,
+            corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+          });
+        }
+
+        if (!ffmpeg.isLoaded()) {
           await ffmpeg.load();
         }
 
         status.innerText = '変換中...（しばらくお待ちください）';
 
-        // ブラウザ上の仮想ファイルシステムに書き込み
         ffmpeg.FS('writeFile', 'input.m4a', await fetchFile(selectedFile));
-
-        // FFmpegコマンドの実行 (M4A -> FLAC)
         await ffmpeg.run('-i', 'input.m4a', 'output.flac');
 
-        // 変換結果の読み込み
         const data = ffmpeg.FS('readFile', 'output.flac');
 
-        // ダウンロードリンクの作成
         const blob = new Blob([data.buffer], { type: 'audio/flac' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
